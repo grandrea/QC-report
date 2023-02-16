@@ -2,7 +2,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import glob
+import os
 
+os.chdir("S:\\Processing_MQ\\")
+
+#functions-----------------------------------------------------------
 def checkFAIMS(raw_file):
     if "faims" in str(raw_file).lower():
         return "FAIMS"
@@ -24,7 +28,7 @@ def CleanUpList(files_list):
 
     files_df = files_df[files_df['Raw file'].str.contains('200ng')]
     files_df["raw_date"] = files_df["Raw file"].str.split("_").str[0]
-    files_df["date"] = pd.to_datetime(files_df["raw_date"], format='%y%m%d')
+    files_df["date"] = pd.to_datetime(files_df["raw_date"], format='%y%m%d').dt.date
     files_df["FAIMS"] = files_df["Raw file"].apply(checkFAIMS)
     files_df["Detector"] = files_df["Raw file"].apply(checkDetector)
     files_df = files_df.reset_index()
@@ -33,6 +37,14 @@ def CleanUpList(files_list):
     except KeyError:
         pass
     return files_df
+
+def AddType(df):
+    df["type"] = df["FAIMS"]+"_"+df["Detector"]
+    return df
+
+def CleanUpRawFile(df):
+    df["Raw file"] = df["Raw file"].str.replace(".*\\\combined_","", regex=True).str.replace("raw.*", "raw")
+    return df
 
 def NumberOfProteins(df):
     '''extract number of proteins from ProteinGroups file'''
@@ -43,7 +55,25 @@ def NumberOfProteins(df):
     number_of_proteins = len(df)
     return number_of_proteins
 
-#grab protein groups files-------------
+def QCplot(df, y_value, axs_value, title=None):
+    '''plot time series of a particular value by detector and faims'''
+    sns.lineplot(data=df, x="date",
+                 y=y_value,
+                 hue="type",
+                 markers=True,
+                 estimator="mean",
+                 errorbar="sd",
+                 style="type",
+                 dashes=False,
+                 ax=axs_value)
+    axs_value.tick_params(axis='x', rotation=90)
+    axs_value.set_title(title)
+    axs_value.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+
+
+
+
+#grab number of proteins from protein groups files-------------
 
 proteinGroups_list = glob.glob("*HeLa*/*/txt/*proteinGroups.txt")
 
@@ -67,6 +97,7 @@ for element, rawfile in summaryFiles_df.iterrows():
         summary = pd.read_csv(rawfile["Raw file"], delimiter="\t")
         if len(summary)==2:
             summary = summary[summary["Raw file"]!="Total"]
+            summary = summary.drop(["Raw file"], axis=1)
             summary["Detector"] = rawfile["Detector"]
             summary["FAIMS"] = rawfile["FAIMS"]
             summary["date"] = rawfile["date"]
@@ -77,6 +108,7 @@ for element, rawfile in summaryFiles_df.iterrows():
         summary_line = pd.read_csv(rawfile["Raw file"], delimiter="\t")
         if len(summary_line)==2:
             summary_line = summary_line[summary_line["Raw file"]!="Total"]
+            summary_line = summary_line.drop(["Raw file"], axis=1)
             summary_line["Detector"] = rawfile["Detector"]
             summary_line["FAIMS"] = rawfile["FAIMS"]
             summary_line["date"] = rawfile["date"]
@@ -88,57 +120,124 @@ for element, rawfile in summaryFiles_df.iterrows():
 #grab msms files-----------------
 msmsFiles_list =  glob.glob("*HeLa*/*/txt/*msms.txt")
 msmsFiles_df = CleanUpList(msmsFiles_list)
-precursor_error = []
-precursor_sd= []
+
 for element, rawfile in msmsFiles_df.iterrows():
-    msms = pd.read_csv(rawfile["Raw file"], delimiter="\t")
-    
+    if element==0:
+        msms = pd.read_csv(rawfile["Raw file"], 
+                           delimiter="\t", 
+                           low_memory=False)
+        msms = msms.drop(["Raw file"], axis=1)
+        msms["date"] = rawfile["date"]
+        msms["Raw file"] = rawfile["Raw file"]
+        msms["FAIMS"] = rawfile["FAIMS"]
+        msms["Detector"] = rawfile["Detector"]
+    else:
+        msms_line = pd.read_csv(rawfile["Raw file"], 
+                                delimiter="\t", 
+                                low_memory=False)
+        msms_line = msms_line.drop(["Raw file"], axis=1)
+        msms_line["date"] = rawfile["date"]
+        msms_line["Raw file"] = rawfile["Raw file"]
+        msms_line["FAIMS"] = rawfile["FAIMS"]
+        msms_line["Detector"] = rawfile["Detector"]
+        msms = pd.concat([msms, msms_line], ignore_index=True)
 
-            
 
-summary["Raw file"] = summary["Raw file"].str.replace(".*\\\combined_","", regex=True).str.replace("raw.*", "raw")
-proteinGroups_df["Raw file"] = proteinGroups_df["Raw file"].str.replace(".*\\\combined_","", regex=True).str.replace("raw.*", "raw")
+#grab evidence files-----------------
+evidenceFiles_list =  glob.glob("*HeLa*/*/txt/*evidence.txt")
+evidenceFiles_df = CleanUpList(evidenceFiles_list)
+
+for element, rawfile in evidenceFiles_df.iterrows():
+    if element==0:
+        evidence = pd.read_csv(rawfile["Raw file"], delimiter="\t")
+        evidence = evidence.drop(["Raw file"], axis=1)
+        evidence["date"] = rawfile["date"]
+        evidence["Raw file"] = rawfile["Raw file"]
+        evidence["FAIMS"] = rawfile["FAIMS"]
+        evidence["Detector"] = rawfile["Detector"]
+    else:
+        evidence_line = pd.read_csv(rawfile["Raw file"], delimiter="\t")
+        evidence_line = evidence_line.drop(["Raw file"], axis=1)
+        evidence_line["date"] = rawfile["date"]
+        evidence_line["Raw file"] = rawfile["Raw file"]
+        evidence_line["FAIMS"] = rawfile["FAIMS"]
+        evidence_line["Detector"] = rawfile["Detector"]
+        evidence = pd.concat([evidence, evidence_line], ignore_index=True)
+
+   
+#grab MS scans---------------------
+
+#add identifiable attributes to data frames--------    
+summary = AddType(summary)
+proteinGroups_df = AddType(proteinGroups_df)
+msms = AddType(msms)
+evidence = AddType(evidence)
+
+summary = CleanUpRawFile(summary)
+proteinGroups_df = CleanUpRawFile(proteinGroups_df)
+msms = CleanUpRawFile(msms)
+evidence = CleanUpRawFile(evidence)
+
+
 
 #merge summary and proteinGroups statistics----------------------
 QC_df = pd.merge(right=proteinGroups_df,
          left=summary,
-         on=["Detector", "FAIMS", "date", "Raw file"], 
+         on=["Detector", "FAIMS", "date", "Raw file", "type"], 
          how="outer")
 
-QC_df["type"] = QC_df["FAIMS"]+"_"+QC_df["Detector"]
 
-plt.close()
+#plots-------------------------
 plt.clf()
-sns.lineplot(data=QC_df, x="date",
-             y="proteins",
+fig, axs = plt.subplots(6, layout='constrained',
+                         figsize=(3.5 * 4, 3.5 * 6))
+
+#Standard line plots
+QCplot(QC_df, "proteins", axs[0], "Identified proteins")
+QCplot(QC_df, "MS", axs[1], "MS1 scans")
+QCplot(QC_df, "MS/MS", axs[2], "MS2 scans")
+QCplot(QC_df, "MS/MS submitted", axs[3], "MS2 submitted")
+QCplot(QC_df, "MS/MS identified [%]", axs[4], "MS2 identification rate")
+#violin plot
+sns.violinplot(data=evidence, x="date",
+             y="Uncalibrated mass error [ppm]",
              hue="type",
-             markers=True,
              style="type",
-             dashes=False)
-
-plt.xticks(rotation=90)
-plt.title("Identified proteins")
-
-plt.close()
-plt.clf()
-sns.lineplot(data=QC_df, x="date",
-             y="MS/MS submitted",
-             hue="type",
+             errorbar="sd",
+             estimator="median",
+             inner=None,
              markers=True,
-             style="type",
-             dashes=False)
+             dashes=False,
+             ax=axs[5])
+axs[5].tick_params(axis='x', rotation=90)
+axs[5].set_title("precursor mass error")
+axs[5].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
-plt.xticks(rotation=90)
-plt.title("MS2 submitted")
+plt.tight_layout()
+plt.savefig("QC_summary\\performance.pdf", dpi=300)
 
-plt.close()
-plt.clf()
-sns.lineplot(data=QC_df, x="date",
-             y="MS/MS identified [%]",
-             hue="type",
-             markers=True,
-             style="type",
-             dashes=False)
+# figure_list = [identifiedProteins, msmsSubmitted, msmsIDRate]
 
-plt.xticks(rotation=90)
-plt.title("MSMS identification rate")
+
+# fig, axs = plt.subplots(len(figure_list))
+# for i, element in enumerate(figre_list):
+    
+
+# plt.close()
+# plt.clf()
+# sns.violinplot(data=evidence, x="date",
+#              y="Uncalibrated mass error [ppm]",
+#              hue="type",
+#              style="type",
+#              errorbar="sd",
+#              estimator="median",
+#              inner=None,
+#              markers=True,
+#              dashes=False)
+
+# plt.xticks(rotation=90)
+# plt.title("Uncalibrated precursor mass error")
+# plt.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+# plt.savefig("QC_summary\\performance.pdf", dpi=300)
+
+
