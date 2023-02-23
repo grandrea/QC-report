@@ -46,12 +46,13 @@ def CleanUpRawFile(df):
     df["Raw file"] = df["Raw file"].str.replace(".*\\\combined_","", regex=True).str.replace("raw.*", "raw")
     return df
 
-def NumberOfProteins(df):
+def NumberOfProteins(df, min_peptides=0):
     '''extract number of proteins from ProteinGroups file'''
     #filter out reverse, contaminant, identified by site.
     df = df[df["Reverse"]!="+"]
     df = df[df["Potential contaminant"]!="+"]
     df = df[df["Only identified by site"]!="+"]
+    df = df[df["Peptides"]>=min_peptides]
     number_of_proteins = len(df)
     return number_of_proteins
 
@@ -80,11 +81,14 @@ proteinGroups_list = glob.glob("*HeLa*/*/txt/*proteinGroups.txt")
 proteinGroups_df = CleanUpList(proteinGroups_list)
 
 proteins = []
+proteins_2 = []
 for element, rawfile in proteinGroups_df.iterrows():
     proteinGroups = pd.read_csv(rawfile["Raw file"], delimiter="\t")
-    proteins.append(NumberOfProteins(proteinGroups))
-
+    proteins.append(NumberOfProteins(proteinGroups, min_peptides=0))
+    proteins_2.append(NumberOfProteins(proteinGroups, min_peptides=2))
 proteinGroups_df["proteins"] = proteins
+proteinGroups_df["proteins_min2"] = proteins_2
+
 
 
 #grab summary files---------------
@@ -149,14 +153,14 @@ evidenceFiles_df = CleanUpList(evidenceFiles_list)
 
 for element, rawfile in evidenceFiles_df.iterrows():
     if element==0:
-        evidence = pd.read_csv(rawfile["Raw file"], delimiter="\t")
+        evidence = pd.read_csv(rawfile["Raw file"], delimiter="\t", low_memory=False)
         evidence = evidence.drop(["Raw file"], axis=1)
         evidence["date"] = rawfile["date"]
         evidence["Raw file"] = rawfile["Raw file"]
         evidence["FAIMS"] = rawfile["FAIMS"]
         evidence["Detector"] = rawfile["Detector"]
     else:
-        evidence_line = pd.read_csv(rawfile["Raw file"], delimiter="\t")
+        evidence_line = pd.read_csv(rawfile["Raw file"], delimiter="\t", low_memory=False)
         evidence_line = evidence_line.drop(["Raw file"], axis=1)
         evidence_line["date"] = rawfile["date"]
         evidence_line["Raw file"] = rawfile["Raw file"]
@@ -189,15 +193,16 @@ QC_df = pd.merge(right=proteinGroups_df,
 
 #plots-------------------------
 plt.clf()
-fig, axs = plt.subplots(6, layout='constrained',
+fig, axs = plt.subplots(7, layout='constrained',
                          figsize=(3.5 * 4, 3.5 * 6))
 
 #Standard line plots
 QCplot(QC_df, "proteins", axs[0], "Identified proteins")
-QCplot(QC_df, "MS", axs[1], "MS1 scans")
-QCplot(QC_df, "MS/MS", axs[2], "MS2 scans")
-QCplot(QC_df, "MS/MS submitted", axs[3], "MS2 submitted")
-QCplot(QC_df, "MS/MS identified [%]", axs[4], "MS2 identification rate")
+QCplot(QC_df, "proteins_min2", axs[1], "Identified proteins min. 2 peptides")
+QCplot(QC_df, "MS", axs[2], "MS1 scans")
+QCplot(QC_df, "MS/MS", axs[3], "MS2 scans")
+QCplot(QC_df, "MS/MS submitted", axs[4], "MS2 submitted")
+QCplot(QC_df, "MS/MS identified [%]", axs[5], "MS2 identification rate")
 #violin plot
 sns.violinplot(data=evidence, x="date",
              y="Uncalibrated mass error [ppm]",
@@ -208,10 +213,10 @@ sns.violinplot(data=evidence, x="date",
              inner=None,
              markers=True,
              dashes=False,
-             ax=axs[5])
-axs[5].tick_params(axis='x', rotation=90)
-axs[5].set_title("precursor mass error")
-axs[5].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+             ax=axs[6])
+axs[6].tick_params(axis='x', rotation=90)
+axs[6].set_title("precursor mass error")
+axs[6].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
 plt.tight_layout()
 plt.savefig("QC_summary\\performance.pdf", dpi=300)
