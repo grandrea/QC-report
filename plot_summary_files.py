@@ -6,6 +6,10 @@ import os
 
 os.chdir("S:\\Processing_MQ\\")
 
+#start and end of peptide elution in minutes more or less to get msms id rate on gradient
+pep_start = 20
+pep_end = 80
+
 #functions-----------------------------------------------------------
 def checkFAIMS(raw_file):
     if "faims" in str(raw_file).lower():
@@ -31,6 +35,7 @@ def CleanUpList(files_list):
     files_df["date"] = pd.to_datetime(files_df["raw_date"], format='%y%m%d').dt.date
     files_df["FAIMS"] = files_df["Raw file"].apply(checkFAIMS)
     files_df["Detector"] = files_df["Raw file"].apply(checkDetector)
+    files_df["run_name"] = files_df["Raw file"].str.replace(".*combined_","", regex=True).str.replace(".raw.*", ".raw", regex=True)
     files_df = files_df.reset_index()
     try:
         files_df = files_df.drop("index")
@@ -38,8 +43,11 @@ def CleanUpList(files_list):
         pass
     return files_df
 
-def AddType(df):
-    df["type"] = df["FAIMS"]+"_"+df["Detector"]
+def AddType(df, from_other_source=False, other_source=None):
+    if from_other_source==False:
+        df["type"] = df["FAIMS"]+"_"+df["Detector"]
+    if from_other_source==True:
+        df["type"] = other_source["type"]
     return df
 
 def CleanUpRawFile(df):
@@ -67,12 +75,12 @@ def QCplot(df, y_value, axs_value, title=None):
                  style="type",
                  dashes=False,
                  ax=axs_value)
-    axs_value.tick_params(axis='x', rotation=90)
+#    axs_value.tick_params(axis='x', rotation=90)
     axs_value.set_title(title)
     axs_value.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
 
-
+#HISTORICAL SERIES---------------------------------------------------------------------------
 
 #grab number of proteins from protein groups files-------------
 
@@ -169,8 +177,6 @@ for element, rawfile in evidenceFiles_df.iterrows():
         evidence = pd.concat([evidence, evidence_line], ignore_index=True)
 
    
-#grab MS scans---------------------
-
 #add identifiable attributes to data frames--------    
 summary = AddType(summary)
 proteinGroups_df = AddType(proteinGroups_df)
@@ -193,7 +199,7 @@ QC_df = pd.merge(right=proteinGroups_df,
 
 #plots-------------------------
 plt.clf()
-fig, axs = plt.subplots(7, layout='constrained',
+fig, axs = plt.subplots(8, layout='constrained',
                          figsize=(3.5 * 4, 3.5 * 6))
 
 #Standard line plots
@@ -218,31 +224,161 @@ axs[6].tick_params(axis='x', rotation=90)
 axs[6].set_title("precursor mass error")
 axs[6].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
+sns.lineplot(data=msms,x="date",
+             y="Intensity coverage",
+             hue="type",
+             estimator="median",
+             markers="o",
+             errorbar="sd",
+             err_style="bars",
+             ax=axs[7])
+axs[7].set_title("MS2 intensity coverage")
+axs[7].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+
 plt.tight_layout()
 plt.savefig("QC_summary\\performance.pdf", dpi=300)
 
-# figure_list = [identifiedProteins, msmsSubmitted, msmsIDRate]
 
+#PER-RUN REPORT------------------------------------------
 
-# fig, axs = plt.subplots(len(figure_list))
-# for i, element in enumerate(figre_list):
+run_lists = glob.glob("*HeLa*/*/txt/")
+run_df = CleanUpList(run_lists)
+
+for element, search_name in run_df.iterrows():
+    search_name=AddType(search_name)
+    try:
+        msScan = pd.read_csv(str(search_name["Raw file"]+"msScans.txt"), delimiter="\t", low_memory=False)
+        msScan = AddType(msScan, from_other_source=True, other_source=search_name)
+        msScan["Cycle time rolling ave"] = msScan[["Cycle time"]].rolling(100).mean()
+        msScan_produced=True
+    except FileNotFoundError:
+        msScan_produced=False
+    #grab tables-----------
+    summary = pd.read_csv(str(search_name["Raw file"]+"summary.txt"), delimiter="\t", low_memory=False)
+    summary = AddType(summary, from_other_source=True, other_source=search_name)
+    msms = pd.read_csv(str(search_name["Raw file"]+"msms.txt"), delimiter="\t", low_memory=False)
+    msms = AddType(msms, from_other_source=True, other_source=search_name)
+    msms_Scans =  pd.read_csv(str(search_name["Raw file"]+"msmsScans.txt"), delimiter="\t", low_memory=False)
+    msms_Scans = msms_Scans.fillna("-")
+    msms_Scans = AddType(msms_Scans, from_other_source=True, other_source=search_name)
+    evidence = pd.read_csv(str(search_name["Raw file"]+"evidence.txt"), delimiter="\t", low_memory=False)
+    evidence = AddType(evidence, from_other_source=True, other_source=search_name)
+    proteinGroups = pd.read_csv(str(search_name["Raw file"]+"proteinGroups.txt"), delimiter="\t", low_memory=False)
+    proteinGroups = AddType(proteinGroups, from_other_source=True, other_source=search_name)
     
-
-# plt.close()
-# plt.clf()
-# sns.violinplot(data=evidence, x="date",
-#              y="Uncalibrated mass error [ppm]",
-#              hue="type",
-#              style="type",
-#              errorbar="sd",
-#              estimator="median",
-#              inner=None,
-#              markers=True,
-#              dashes=False)
-
-# plt.xticks(rotation=90)
-# plt.title("Uncalibrated precursor mass error")
-# plt.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
-# plt.savefig("QC_summary\\performance.pdf", dpi=300)
+    #summary parameters for table in report
+    ms1_spectra = summary["MS"][0]
+    ms2_spectra = summary["MS/MS"][0]
+    
+    proteins_with_contaminants = len(proteinGroups[proteinGroups["Reverse"]!="+"])
+    contaminants = len(proteinGroups[proteinGroups["Potential contaminant"]=="+"])
+    proteins = NumberOfProteins(proteinGroups)
+    proteins_min_2_peptides = NumberOfProteins(proteinGroups, min_peptides=2)
+    quantified_proteins = len(proteinGroups[proteinGroups["Reverse"]!="+"][proteinGroups["iBAQ"]>0][proteinGroups["Potential contaminant"]!="+"][proteinGroups["Only identified by site"]!="+"])
+    
+    msms_id_rate = summary["MS/MS identified [%]"][0]
+    isotope_patterns_detected = summary["Isotope patterns"][0]
+    isotope_atterns_sequenced_z_1 = summary["Isotope patterns sequenced (z>1)"][0]
+    
+    #different summary parameters if msscans file is available-----
+    if msScan_produced==False:
+        summary_table = {"parameter" : ["ms1_spectra",
+                                      "ms2_spectra",
+                                      "proteins_with_contaminants",
+                                      "contaminants",
+                                      "proteins, no rev. cont. no only site",
+                                      "proteins_min_2_peptides",
+                                      "quantified_proteins",
+                                      "msms_id_rate [%]",
+                                      "isotope_patterns_detected",
+                                      "isotope_atterns_sequenced_z_1"],
+                         "number" : [ms1_spectra,
+                                     ms2_spectra,
+                                     proteins_with_contaminants,
+                                     contaminants,
+                                     proteins,
+                                     proteins_min_2_peptides,
+                                     quantified_proteins,
+                                     msms_id_rate,
+                                     isotope_patterns_detected,
+                                     isotope_atterns_sequenced_z_1]}
+        
+        summary_table = pd.DataFrame.from_dict(summary_table)
+    elif msScan_produced==True:
+        ms_scan_gradient = msScan[(msScan["Retention time"] > pep_start) & (msScan["Retention time"] <pep_end)]
+        msms_id_rate_gradient = ms_scan_gradient["MS/MS identification rate [%]"].mean()
+        summary_table = {"parameter" : ["ms1_spectra",
+                                      "ms2_spectra",
+                                      "proteins_with_contaminants",
+                                      "contaminants",
+                                      "proteins, no rev. cont. no only site",
+                                      "proteins_min_2_peptides",
+                                      "quantified_proteins",
+                                      "msms_id_rate [%]",
+                                      "msms_id_rate (on gradient) [%]",
+                                      "isotope_patterns_detected",
+                                      "isotope_atterns_sequenced_z_1"],
+                         "number" : [ms1_spectra,
+                                     ms2_spectra,
+                                     proteins_with_contaminants,
+                                     contaminants,
+                                     proteins,
+                                     proteins_min_2_peptides,
+                                     quantified_proteins,
+                                     msms_id_rate,
+                                     msms_id_rate_gradient,
+                                     isotope_patterns_detected,
+                                     isotope_atterns_sequenced_z_1]}        
+        summary_table = pd.DataFrame.from_dict(summary_table)
+    
+    figname = str("QC_summary\\" + str(search_name["date"]) +"_" + search_name["type"] + "_" +search_name["run_name"] +"_report.pdf")
+    
+    
+    
+    report_exists = len(glob.glob(figname))
+    if msScan_produced==True:
+        plt.clf()
+        fig, axs = plt.subplots(8, layout='constrained',
+                                 figsize=(3.5 * 4, 3.5 * 6))
+        sns.lineplot(data=msScan, x="Retention time", y="Total ion current", ax=axs[0])
+        secondary = axs[0].twinx()
+        sns.lineplot(data=msScan, x="Retention time", y="MS/MS identification rate [%]", ax=secondary, color="orange")
+        axs[0].set_title("TIC & MSMS Id Rate")
+        
+        sns.lineplot(data=msScan, x="Retention time", y="MS/MS count", ax=axs[1])
+        ax2=axs[1].twinx()
+        sns.lineplot(data=msScan, x="Retention time", y="MS/MS / s", color="orange", ax=ax2)
+        axs[1].set_title("MSMS count & scan per second")
+        
+        
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time", ax=axs[2])
+        ax3 = axs[2].twinx()
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time rolling ave", color="orange", ax=ax3)
+        axs[2].set_title("cycle times")
+        
+        sns.histplot(data=evidence, x="Uncalibrated mass error [ppm]", ax=axs[3])
+        axs[3].axvline(x=evidence["Uncalibrated mass error [ppm]"].mean(), color="orange", lw=2.5)
+        #axs[3].text(3, 500, str((evidence["Uncalibrated mass error [ppm]"].mean().round(3))+" ppm"))
+        axs[3].set_title("precursor mass error")
+        axs[3].set_xlim(-5,5)
+        
+        sns.histplot(data=msms, x="Intensity coverage", ax=axs[4])
+        axs[4].set_title("Intensity coverage in msms")
+        axs[4].set_xlim(0,1)
+        
+        sns.histplot(data=msms, x="Isotope index", ax=axs[5])
+        axs[5].set_title("Isotope index")
+        
+        sns.scatterplot(data=msms_Scans, x='Retention time', y='m/z', hue="Identified", size='Identified', sizes=(1.2, 0.5), ax=axs[6])
+        
+        axs[7].table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
+        
+        plt.suptitle(str("Report for" + search_name["run_name"]+ " , "+ str(search_name["type"])+ " " + str(search_name["date"])))
+        
+        plt.savefig(figname, dpi=300)
+        
+        
+        
+     
 
 
