@@ -250,6 +250,8 @@ for element, search_name in run_df.iterrows():
         msScan = pd.read_csv(str(search_name["Raw file"]+"msScans.txt"), delimiter="\t", low_memory=False)
         msScan = AddType(msScan, from_other_source=True, other_source=search_name)
         msScan["Cycle time rolling ave"] = msScan[["Cycle time"]].rolling(100).mean()
+        ms_scan_gradient = msScan[(msScan["Retention time"] > pep_start) & (msScan["Retention time"] <pep_end)]
+        msms_id_rate_gradient = ms_scan_gradient["MS/MS identification rate [%]"].mean().round(3)
         msScan_produced=True
     except FileNotFoundError:
         msScan_produced=False
@@ -305,8 +307,7 @@ for element, search_name in run_df.iterrows():
         
         summary_table = pd.DataFrame.from_dict(summary_table)
     elif msScan_produced==True:
-        ms_scan_gradient = msScan[(msScan["Retention time"] > pep_start) & (msScan["Retention time"] <pep_end)]
-        msms_id_rate_gradient = ms_scan_gradient["MS/MS identification rate [%]"].mean()
+
         summary_table = {"parameter" : ["ms1_spectra",
                                       "ms2_spectra",
                                       "proteins_with_contaminants",
@@ -369,13 +370,20 @@ for element, search_name in run_df.iterrows():
         sns.histplot(data=msms, x="Isotope index", ax=axs[5])
         axs[5].set_title("Isotope index")
         
-        sns.scatterplot(data=msms_Scans, x='Retention time', y='m/z', hue="Identified", size='Identified', sizes=(1.2, 0.5), ax=axs[6])
+        sns.scatterplot(data=msms_Scans,
+                        x='Retention time',
+                        y='m/z',
+                        hue="Identified",
+                        size='Identified',
+                        sizes=(18, 4),
+                        edgecolor=None,
+                        ax=axs[6])
         
         axs[7].table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
-        
+        axs[7].axis("off")
         plt.suptitle(str("Report for" + search_name["run_name"]+ " , "+ str(search_name["type"])+ " " + str(search_name["date"])))
         
-        plt.savefig(figname, dpi=300)
+        plt.savefig(figname, dpi=200)
         
         
         
