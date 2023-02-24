@@ -370,14 +370,19 @@ for element, search_name in run_df.iterrows():
         sns.histplot(data=msms, x="Isotope index", ax=axs[5])
         axs[5].set_title("Isotope index")
         
-        sns.scatterplot(data=msms_Scans,
+        sns.scatterplot(data=msms_Scans[msms_Scans["Identified"]=="-"],
                         x='Retention time',
                         y='m/z',
-                        hue="Identified",
-                        size='Identified',
-                        sizes=(18, 4),
                         edgecolor=None,
+                        color="gray",
                         ax=axs[6])
+        ax6=axs[6].twinx()
+        sns.scatterplot(data=msms_Scans[msms_Scans["Identified"]=="+"],
+                        x='Retention time',
+                        y="m/z",
+                        edgecolor=None,
+                        color="orange",
+                        ax=ax6)
         
         axs[7].table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
         axs[7].axis("off")
