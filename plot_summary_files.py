@@ -7,7 +7,7 @@ import os
 os.chdir("S:\\Processing_MQ\\")
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
-pep_start = 20
+pep_start = 15
 pep_end = 80
 
 #functions-----------------------------------------------------------
@@ -15,7 +15,7 @@ def checkFAIMS(raw_file):
     if "faims" in str(raw_file).lower():
         return "FAIMS"
     else:
-        return "no FAIMS"
+        return "noFAIMS"
 
 def checkDetector(raw_file):
     if "IT" in raw_file:
