@@ -258,7 +258,7 @@ sns.violinplot(data=evidence, x="date",
              inner=None,
              markers=True,
              dashes=False,
-             ax=axs[6])
+             ax=axs[6], rasterized=True)
 axs[6].tick_params(axis='x', rotation=90)
 axs[6].set_title("precursor mass error")
 axs[6].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
@@ -270,7 +270,7 @@ sns.lineplot(data=msms,x="date",
              markers="o",
              errorbar="sd",
              err_style="bars",
-             ax=axs[7])
+             ax=axs[7], rasterized=True)
 axs[7].set_title("MS2 intensity coverage")
 axs[7].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 

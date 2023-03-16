@@ -52,11 +52,9 @@ rawfile_name = args.infile
 
 run_mspicture = args.run_mspicture
 
-
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
 pep_start = args.gradient_start
 pep_end =args.gradient_end
-
 
 #some config options
 
@@ -79,13 +77,6 @@ def checkDetector(raw_file):
         return "other"
 
 
-def AddType(df, from_other_source=False, other_source=None):
-    if from_other_source==False:
-        df["type"] = df["FAIMS"]+"_"+df["Detector"]
-    if from_other_source==True:
-        df["type"] = other_source["type"]
-    return df
-
 def CleanUpRawFile(df):
     df["Raw file"] = df["Raw file"].str.replace(".*\\\combined_","", regex=True).str.replace("raw.*", "raw")
     return df
@@ -99,21 +90,6 @@ def NumberOfProteins(df, min_peptides=0):
     df = df[df["Peptides"]>=min_peptides]
     number_of_proteins = len(df)
     return number_of_proteins
-
-def QCplot(df, y_value, axs_value, title=None):
-    '''plot time series of a particular value by detector and faims'''
-    sns.lineplot(data=df, x="date",
-                 y=y_value,
-                 hue="type",
-                 markers=True,
-                 estimator="mean",
-                 errorbar="sd",
-                 style="type",
-                 dashes=False,
-                 ax=axs_value)
-#    axs_value.tick_params(axis='x', rotation=90)
-    axs_value.set_title(title)
-    axs_value.legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
 
 def MSPicture(raw_file, msPicture_command_path):
