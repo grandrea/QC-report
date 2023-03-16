@@ -10,7 +10,7 @@ import re
 os.chdir("S:\\Processing_MQ\\")
 
 run_mspicture = True
-msPicture_command_path = str("path\\to\\mspicture.exe")
+msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
 pep_start = 15
@@ -425,33 +425,33 @@ for element, search_name in run_df.iterrows():
             ap7 = plt.subplot2grid((6,3), (4,0), colspan=3)
             ap8 = plt.subplot2grid((6,3), (5,0), colspan=3)
         
-        sns.lineplot(data=msScan, x="Retention time", y="Total ion current", ax=ap1)
+        sns.lineplot(data=msScan, x="Retention time", y="Total ion current", ax=ap1, rasterized=True)
         secondary = ap1.twinx()
         sns.lineplot(data=msScan, x="Retention time", y="MS/MS identification rate [%]", ax=secondary, color="orange")
         ap1.set_title("TIC & MSMS Id Rate")
         
-        sns.lineplot(data=msScan, x="Retention time", y="MS/MS count", ax=ap2)
+        sns.lineplot(data=msScan, x="Retention time", y="MS/MS count", ax=ap2, rasterized=True)
         ax2=ap2.twinx()
         sns.lineplot(data=msScan, x="Retention time", y="MS/MS / s", color="orange", ax=ax2)
         ap2.set_title("MSMS count & scan per second")
         
         
-        sns.lineplot(data=msScan, x="Retention time", y="Cycle time", ax=ap3)
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time", ax=ap3, rasterized=True)
         ax3 = ap3.twinx()
-        sns.lineplot(data=msScan, x="Retention time", y="Cycle time rolling ave", color="orange", ax=ax3)
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time rolling ave", color="orange", ax=ax3, rasterized=True)
         ap3.set_title("cycle times")
         
-        sns.histplot(data=evidence, x="Uncalibrated mass error [ppm]", ax=ap4)
+        sns.histplot(data=evidence, x="Uncalibrated mass error [ppm]", ax=ap4, rasterized=True)
         ap4.axvline(x=evidence["Uncalibrated mass error [ppm]"].mean(), color="orange", lw=2.5)
         #axs[3].text(3, 500, str((evidence["Uncalibrated mass error [ppm]"].mean().round(3))+" ppm"))
         ap4.set_title("precursor mass error")
         ap4.set_xlim(-5,5)
         
-        sns.histplot(data=msms, x="Intensity coverage", ax=ap5)
+        sns.histplot(data=msms, x="Intensity coverage", ax=ap5, rasterized=True)
         ap5.set_title("Intensity coverage in msms")
         ap5.set_xlim(0,1)
         
-        sns.histplot(data=msms, x="Isotope index", ax=ap6)
+        sns.histplot(data=msms, x="Isotope index", ax=ap6, rasterized=True)
         ap6.set_title("Isotope index")
         
         sns.scatterplot(data=msms_Scans[msms_Scans["Identified"]=="-"],
@@ -459,7 +459,7 @@ for element, search_name in run_df.iterrows():
                         y='m/z',
                         edgecolor=None,
                         color="gray",
-                        ax=ap7)
+                        ax=ap7, rasterized=True)
         
         ax6=ap7.twinx()
         sns.scatterplot(data=msms_Scans[msms_Scans["Identified"]=="+"],
@@ -467,7 +467,7 @@ for element, search_name in run_df.iterrows():
                 y="m/z",
                 edgecolor=None,
                 color="orange",
-                ax=ax6)
+                ax=ax6, rasterized=True)
         
         ap8.table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
         ap8.axis("off")
