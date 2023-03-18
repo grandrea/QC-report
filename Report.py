@@ -13,7 +13,9 @@ import sys
 
 
 parser = argparse.ArgumentParser(prog='Maxquant Report generation',
-                    description='generates report from maxquant output files',
+                    description=str('generates report from maxquant output files.\n'+
+                                    'run from the top of the maxquant directory where\n'+
+                                    'raw file and "combined" directory are located'),
                     epilog='usage: report.py --infile E230203_05_QC_AG_100_HeLa200ng_OT_inj2.raw')
 
 parser.add_argument("--infile", metavar="E230203_05_QC_AG_100_HeLa200ng_OT_inj2.raw",
