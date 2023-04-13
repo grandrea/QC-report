@@ -10,7 +10,8 @@ import re
 os.chdir("S:\\Processing_MQ\\")
 
 run_mspicture = True
-msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
+msPicture_command_path = str("C:\\Users\\andrea.graziadei\\AppData\\Local\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
+specific_date = "2304"
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
 pep_start = 15
@@ -175,8 +176,8 @@ msmsFiles_df = CleanUpList(msmsFiles_list)
 for element, rawfile in msmsFiles_df.iterrows():
     if element==0:
         msms = pd.read_csv(rawfile["Raw file"], 
-                           delimiter="\t", 
-                           low_memory=False)
+                            delimiter="\t", 
+                            low_memory=False)
         msms = msms.drop(["Raw file"], axis=1)
         msms["date"] = rawfile["date"]
         msms["Raw file"] = rawfile["Raw file"]
@@ -231,15 +232,15 @@ evidence = CleanUpRawFile(evidence)
 
 #merge summary and proteinGroups statistics----------------------
 QC_df = pd.merge(right=proteinGroups_df,
-         left=summary,
-         on=["Detector", "FAIMS", "date", "Raw file", "type"], 
-         how="outer")
+          left=summary,
+          on=["Detector", "FAIMS", "date", "Raw file", "type"], 
+          how="outer")
 
 
 #plots-------------------------
 plt.clf()
 fig, axs = plt.subplots(8, layout='constrained',
-                         figsize=(3.5 * 4, 3.5 * 6))
+                          figsize=(3.5 * 4, 3.5 * 6))
 
 #Standard line plots
 QCplot(QC_df, "proteins", axs[0], "Identified proteins")
@@ -250,27 +251,27 @@ QCplot(QC_df, "MS/MS submitted", axs[4], "MS2 submitted")
 QCplot(QC_df, "MS/MS identified [%]", axs[5], "MS2 identification rate")
 #violin plot
 sns.violinplot(data=evidence, x="date",
-             y="Uncalibrated mass error [ppm]",
-             hue="type",
-             style="type",
-             errorbar="sd",
-             estimator="median",
-             inner=None,
-             markers=True,
-             dashes=False,
-             ax=axs[6], rasterized=True)
+              y="Uncalibrated mass error [ppm]",
+              hue="type",
+              style="type",
+              errorbar="sd",
+              estimator="median",
+              inner=None,
+              markers=True,
+              dashes=False,
+              ax=axs[6], rasterized=True)
 axs[6].tick_params(axis='x', rotation=90)
 axs[6].set_title("precursor mass error")
 axs[6].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
 sns.lineplot(data=msms,x="date",
-             y="Intensity coverage",
-             hue="type",
-             estimator="median",
-             markers="o",
-             errorbar="sd",
-             err_style="bars",
-             ax=axs[7], rasterized=True)
+              y="Intensity coverage",
+              hue="type",
+              estimator="median",
+              markers="o",
+              errorbar="sd",
+              err_style="bars",
+              ax=axs[7], rasterized=True)
 axs[7].set_title("MS2 intensity coverage")
 axs[7].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
 
@@ -283,12 +284,24 @@ plt.savefig("QC_summary\\performance.pdf", dpi=300)
 run_lists = glob.glob("*HeLa*/*/txt/")
 run_df = CleanUpList_NoAmount(run_lists)
 
+#specify date
+try:
+    run_df = run_df[run_df["Raw file"].str.contains(specific_date)]
+except:
+    pass
+
+
 for element, search_name in run_df.iterrows():
-    run_mspicture_iteration = True
+    if run_mspicture==True:
+        run_mspicture_iteration = True
+    else:
+        run_mspicture_iteration = False
+    
     search_name=AddType(search_name)
     
     figname = str("QC_summary\\" + str(search_name["date"]) +"_" + search_name["type"] + "_" +search_name["run_name"] +"_report.pdf")
     report_exists = len(glob.glob(figname))
+    
     if report_exists>0:
         continue
     
@@ -297,9 +310,13 @@ for element, search_name in run_df.iterrows():
         try:
             msimage_path_list = MSPicture(search_name["Raw file"], msPicture_command_path)
             msimage_file = msimage_path_list[0]
+            run_mspicture_iteration = True
         except subprocess.CalledProcessError:
-            print("cannot run MSPicture for file "+ search_name["run_name"] + ", skipping...")
+            print("cannot run MSPicture for file "+ search_name["run_name"] + "because of subprocessError, skipping...")
             run_mspicture_iteration = False
+        except NameError:
+            print("cannot run MSPicture for file "+ search_name["run_name"] + " because NameError, skipping...")
+            run_mspicture_iteration = False            
     try:
         msScan = pd.read_csv(str(search_name["Raw file"]+"msScans.txt"), delimiter="\t", low_memory=False)
         msScan = AddType(msScan, from_other_source=True, other_source=search_name)
@@ -402,44 +419,45 @@ for element, search_name in run_df.iterrows():
         fig = plt.figure(figsize=(3.5 * 4, 3.5 * 6))
         if run_mspicture==True and run_mspicture_iteration==True:
             msimage = plt.imread(msimage_file)
-            ap1 = plt.subplot2grid((9,3), (0,0), colspan=3)
-            ap2 = plt.subplot2grid((9,3), (1,0), colspan=3)
-            ap3 = plt.subplot2grid((9,3), (2,0), colspan=3)
-            ap4 = plt.subplot2grid((9,3), (3,0), colspan=1)
-            ap5 = plt.subplot2grid((9,3), (3,1), colspan=1)
-            ap6 = plt.subplot2grid((9,3), (3,2), colspan=1)
-            ap7 = plt.subplot2grid((9,3), (4,0), colspan=3)
-            ap8 = plt.subplot2grid((9,3), (5,0), colspan=3)
-            ap9 = plt.subplot2grid((9,3), (6,0), colspan=3, rowspan=3)
+            ap1 = plt.subplot2grid((11,3), (0,0), colspan=3)
+            ap2 = plt.subplot2grid((11,3), (1,0), colspan=3)
+            ap3 = plt.subplot2grid((11,3), (2,0), colspan=3)
+            ap4 = plt.subplot2grid((11,3), (3,0), colspan=1)
+            ap5 = plt.subplot2grid((11,3), (3,1), colspan=1)
+            ap6 = plt.subplot2grid((11,3), (3,2), colspan=1)
+            ap7 = plt.subplot2grid((11,3), (4,0), colspan=3)
+            ap8 = plt.subplot2grid((11,3), (5,0), colspan=3)
+            ap9 = plt.subplot2grid((11,3), (6,0), colspan=3)
+            ap10 = plt.subplot2grid((11,3), (7,0), colspan=3)
+            ap11 = plt.subplot2grid((11,3), (8,0), colspan=3, rowspan=3)
             # fig, axs = plt.subplots(nrows=3, ncols=3, layout='constrained',
             #                          figsize=(3.5 * 4, 3.5 * 6),
             #                          gridspec_kw={'height_ratios' : [1,1,1,1,1,1,1,1,3]})
         else:
-            msimage = plt.imread(msimage_file)
-            ap1 = plt.subplot2grid((6,3), (0,0), colspan=3)
-            ap2 = plt.subplot2grid((6,3), (1,0), colspan=3)
-            ap3 = plt.subplot2grid((6,3), (2,0), colspan=3)
-            ap4 = plt.subplot2grid((6,3), (3,0), colspan=1)
-            ap5 = plt.subplot2grid((6,3), (3,1), colspan=1)
-            ap6 = plt.subplot2grid((6,3), (3,2), colspan=1)
-            ap7 = plt.subplot2grid((6,3), (4,0), colspan=3)
-            ap8 = plt.subplot2grid((6,3), (5,0), colspan=3)
+            ap1 = plt.subplot2grid((10,3), (0,0), colspan=3)
+            ap2 = plt.subplot2grid((10,3), (1,0), colspan=3)
+            ap3 = plt.subplot2grid((10,3), (2,0), colspan=3)
+            ap4 = plt.subplot2grid((10,3), (3,0), colspan=1)
+            ap5 = plt.subplot2grid((10,3), (3,1), colspan=1)
+            ap6 = plt.subplot2grid((10,3), (3,2), colspan=1)
+            ap7 = plt.subplot2grid((10,3), (4,0), colspan=3)
+            ap8 = plt.subplot2grid((10,3), (5,0), colspan=3)
+            ap9 = plt.subplot2grid((10,3), (6,0), colspan=3)
+            ap10 = plt.subplot2grid((10,3), (7,0), colspan=3)
         
-        sns.lineplot(data=msScan, x="Retention time", y="Total ion current", ax=ap1, rasterized=True)
-        secondary = ap1.twinx()
+        ap1.table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
+        ap1.axis("off")
+                
+        sns.lineplot(data=msScan, x="Retention time", y="Total ion current", ax=ap2, rasterized=True)
+        secondary = ap2.twinx()
         sns.lineplot(data=msScan, x="Retention time", y="MS/MS identification rate [%]", ax=secondary, color="orange")
-        ap1.set_title("TIC & MSMS Id Rate")
+        ap2.set_title("TIC & MSMS Id Rate")
         
-        sns.lineplot(data=msScan, x="Retention time", y="MS/MS count", ax=ap2, rasterized=True)
-        ax2=ap2.twinx()
+        sns.lineplot(data=msScan, x="Retention time", y="MS/MS count", ax=ap3, rasterized=True)
+        ax2=ap3.twinx()
         sns.lineplot(data=msScan, x="Retention time", y="MS/MS / s", color="orange", ax=ax2)
-        ap2.set_title("MSMS count & scan per second")
+        ap3.set_title("MSMS count & scan per second")
         
-        
-        sns.lineplot(data=msScan, x="Retention time", y="Cycle time", ax=ap3, rasterized=True)
-        ax3 = ap3.twinx()
-        sns.lineplot(data=msScan, x="Retention time", y="Cycle time rolling ave", color="orange", ax=ax3, rasterized=True)
-        ap3.set_title("cycle times")
         
         sns.histplot(data=evidence, x="Uncalibrated mass error [ppm]", ax=ap4, rasterized=True)
         ap4.axvline(x=evidence["Uncalibrated mass error [ppm]"].mean(), color="orange", lw=2.5)
@@ -453,6 +471,7 @@ for element, search_name in run_df.iterrows():
         
         sns.histplot(data=msms, x="Isotope index", ax=ap6, rasterized=True)
         ap6.set_title("Isotope index")
+        ap6.set_xlim(-5,5)
         
         sns.scatterplot(data=msms_Scans[msms_Scans["Identified"]=="-"],
                         x='Retention time',
@@ -469,11 +488,32 @@ for element, search_name in run_df.iterrows():
                 color="orange",
                 ax=ax6, rasterized=True)
         
-        ap8.table(cellText=summary_table.values, colLabels=summary_table.columns, loc='center')
-        ap8.axis("off")
         
+        sns.regplot(data=evidence,
+                        x='Retention time',
+                        y='Uncalibrated mass error [ppm]',
+                        ax=ap8, scatter_kws={"rasterized":True, "edgecolor":None})
+        ap8.axhline(y=evidence["Uncalibrated mass error [ppm]"].mean(), color="orange", lw=2.5)
+
+        ap8.set_title("mass error vs retention time")
+        sns.regplot(data=evidence,
+                        x='m/z',
+                        y='Uncalibrated mass error [ppm]',
+                        ax=ap9, scatter_kws={"rasterized":True, "edgecolor":None})
+        ap9.axhline(y=evidence["Uncalibrated mass error [ppm]"].mean(), color="orange", lw=2.5)
+
+        ap9.set_title("mass error vs m/z")
+
+        
+        
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time", ax=ap10, rasterized=True)
+        ax10 = ap10.twinx()
+        sns.lineplot(data=msScan, x="Retention time", y="Cycle time rolling ave", color="orange", ax=ax10, rasterized=True)
+        ap10.set_title("cycle times")
+
+
         if run_mspicture==True and run_mspicture_iteration==True:
-            ap9.imshow(msimage)
+            ap11.imshow(msimage)
         
         
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
