@@ -10,7 +10,7 @@ import re
 os.chdir("S:\\Processing_MQ\\")
 
 run_mspicture = True
-msPicture_command_path = str("C:\\Users\\andrea.graziadei\\AppData\\Local\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
+msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
 specific_date = "2304"
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
