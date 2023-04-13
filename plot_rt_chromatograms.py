@@ -16,9 +16,6 @@ import glob
 # must convert to mzML first
 # slow without peak picking and denoising
 
-os.chdir("C:\\Users\\andrea.graziadei\\Documents\\SSU_Develop\\qcrt")
-
-
 run_list = glob.glob("*mzML")
 
 tolerance = 5  # tolerance in ppm
