@@ -65,6 +65,46 @@ peptides_sorted["y_value"] = peptides_sorted.index +1
 peptides_sorted["y_value"] = peptides_sorted["y_value"].astype("category")
 
 
+peptides_lines = pd.melt(peptides_sorted, id_vars=["Start position", "End position", "y_value"])
+peptides_lines = peptides_lines.rename({'value': 'Intensity', 'variable': 'condition'}, axis=1)
+
+d = {'residue': [], 'condition': [], 'Intensity': []}
+peptides_df = pd.DataFrame(d)
+
+for idx, element in peptides_lines.iterrows():
+    if element["Intensity"] == 0:
+        continue
+    number_of_residues = len(list(range(int(element["Start position"]), int(element["End position"]) + 1)))
+    temp_d = {"residue": list(range(int(element["Start position"]), int(element["End position"]) + 1)),
+              "condition": [element["condition"]] * number_of_residues,
+              "Intensity": [element["Intensity"]] * number_of_residues}
+    temp_df = pd.DataFrame(temp_d)
+    peptides_df = pd.concat([peptides_df, temp_df], ignore_index=True)
+
+peptides_df["Log2 Intensity"] = np.log2(peptides_df["Intensity"])
+
+plt.clf()
+fig, axs = plt.subplots(len(column_names),
+                        layout='constrained',
+                        figsize=(14, 10),
+                        sharex=True)
+for idx, column_name in enumerate(column_names):
+    sns.lineplot(data=peptides_df[peptides_df["condition"] == column_name],
+                 x="residue",
+                 y="Intensity",
+                 ax=axs[idx])
+    #    axs[idx].get_legend().remove()
+    axs[idx].set_xlim(0, sequence_length)
+    axs[idx].set(yticklabels=[])
+    axs[idx].set(ylabel=None)
+    axs[idx].set(yticks=[])
+    if idx == (len(conditions) - 1):
+        axs[idx].set_xlabel("residue")
+    else:
+        axs[idx].set(xlabel=None)
+    axs[idx].set_title(conditions[idx])
+plt.savefig("coverage_lines.pdf", dpi=300)
+
 
 plt.clf()
 fig, axs = plt.subplots(len(conditions),
