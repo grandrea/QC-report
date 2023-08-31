@@ -10,8 +10,9 @@ import re
 os.chdir("S:\\Processing_MQ\\")
 
 run_mspicture = True
-msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
-specific_date = "2304"
+msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
+specific_date = "2308"
+specific_year = "E23"
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
 pep_start = 15
@@ -32,11 +33,10 @@ def checkDetector(raw_file):
     else:
         return "other"
 
-def CleanUpList(files_list):
+def CleanUpList(files_list,specific_year):
     files_list = pd.Series(files_list, name="Raw file")
     files_df = pd.DataFrame(files_list)
-
-
+    files_df = files_df[files_df['Raw file'].str.contains(specific_year)]
     files_df = files_df[files_df['Raw file'].str.contains('200ng')]
     files_df["raw_date"] = files_df["Raw file"].str.split("_").str[0]
     files_df["date"] = pd.to_datetime(files_df["raw_date"], format='%y%m%d').dt.date
@@ -126,7 +126,7 @@ def MSPicture(raw_file, msPicture_command_path):
 
 proteinGroups_list = glob.glob("*HeLa*/*/txt/*proteinGroups.txt")
 
-proteinGroups_df = CleanUpList(proteinGroups_list)
+proteinGroups_df = CleanUpList(proteinGroups_list, specific_year)
 
 proteins = []
 proteins_2 = []
@@ -142,7 +142,7 @@ proteinGroups_df["proteins_min2"] = proteins_2
 #grab summary files---------------
 #needs MQ runs with a single raw file
 summaryFiles_list =  glob.glob("*HeLa*/*/txt/*summary.txt")
-summaryFiles_df = CleanUpList(summaryFiles_list)
+summaryFiles_df = CleanUpList(summaryFiles_list, specific_year)
 
 for element, rawfile in summaryFiles_df.iterrows():
     if element==0:
@@ -171,7 +171,7 @@ for element, rawfile in summaryFiles_df.iterrows():
             
 #grab msms files-----------------
 msmsFiles_list =  glob.glob("*HeLa*/*/txt/*msms.txt")
-msmsFiles_df = CleanUpList(msmsFiles_list)
+msmsFiles_df = CleanUpList(msmsFiles_list, specific_year)
 
 for element, rawfile in msmsFiles_df.iterrows():
     if element==0:
@@ -184,20 +184,26 @@ for element, rawfile in msmsFiles_df.iterrows():
         msms["FAIMS"] = rawfile["FAIMS"]
         msms["Detector"] = rawfile["Detector"]
     else:
-        msms_line = pd.read_csv(rawfile["Raw file"], 
-                                delimiter="\t", 
-                                low_memory=False)
-        msms_line = msms_line.drop(["Raw file"], axis=1)
-        msms_line["date"] = rawfile["date"]
-        msms_line["Raw file"] = rawfile["Raw file"]
-        msms_line["FAIMS"] = rawfile["FAIMS"]
-        msms_line["Detector"] = rawfile["Detector"]
-        msms = pd.concat([msms, msms_line], ignore_index=True)
-
-
+        try:
+            msms_line = pd.read_csv(rawfile["Raw file"], 
+                                    delimiter="\t", 
+                                    low_memory=False)
+            msms_line = msms_line.drop(["Raw file"], axis=1)
+            msms_line["date"] = rawfile["date"]
+            msms_line["Raw file"] = rawfile["Raw file"]
+            msms_line["FAIMS"] = rawfile["FAIMS"]
+            msms_line["Detector"] = rawfile["Detector"]
+            msms = pd.concat([msms, msms_line], ignore_index=True)
+        except:
+            print("Fail at\n")
+            print(rawfile["Raw file"])
+            continue
+            
+            
+            
 #grab evidence files-----------------
 evidenceFiles_list =  glob.glob("*HeLa*/*/txt/*evidence.txt")
-evidenceFiles_df = CleanUpList(evidenceFiles_list)
+evidenceFiles_df = CleanUpList(evidenceFiles_list, specific_year)
 
 for element, rawfile in evidenceFiles_df.iterrows():
     if element==0:
@@ -216,16 +222,45 @@ for element, rawfile in evidenceFiles_df.iterrows():
         evidence_line["Detector"] = rawfile["Detector"]
         evidence = pd.concat([evidence, evidence_line], ignore_index=True)
 
-   
+
+#grab msScans files
+msScansFiles_list =  glob.glob("*HeLa*/*/txt/msScans.txt")
+msScansFiles_df = CleanUpList(msScansFiles_list, specific_year)
+
+for element, rawfile in msScansFiles_df.iterrows():
+    if element==0:
+        msScans = pd.read_csv(rawfile["Raw file"], delimiter="\t", low_memory=False)
+        msScans = msScans.drop(["Raw file"], axis=1)
+        msScans["date"] = rawfile["date"]
+        msScans["Raw file"] = rawfile["Raw file"]
+        msScans["FAIMS"] = rawfile["FAIMS"]
+        msScans["Detector"] = rawfile["Detector"]
+        msScans = msScans[msScans["Retention time"]>pep_start]
+        msScans = msScans[msScans["Retention time"]<pep_end]
+    else:
+        msScans_line = pd.read_csv(rawfile["Raw file"], delimiter="\t", low_memory=False)
+        msScans_line = msScans_line.drop(["Raw file"], axis=1)
+        msScans_line["date"] = rawfile["date"]
+        msScans_line["Raw file"] = rawfile["Raw file"]
+        msScans_line["FAIMS"] = rawfile["FAIMS"]
+        msScans_line["Detector"] = rawfile["Detector"]
+        msScans_line = msScans_line[msScans_line["Retention time"]>pep_start]
+        msScans_line = msScans_line[msScans_line["Retention time"]<pep_end]
+        msScans = pd.concat([msScans, msScans_line], ignore_index=True)
+
+    
 #add identifiable attributes to data frames--------    
 summary = AddType(summary)
 proteinGroups_df = AddType(proteinGroups_df)
 msms = AddType(msms)
 evidence = AddType(evidence)
+msScans = AddType(msScans)
 
 summary = CleanUpRawFile(summary)
 proteinGroups_df = CleanUpRawFile(proteinGroups_df)
 msms = CleanUpRawFile(msms)
+msScans = CleanUpRawFile(msScans)
+
 evidence = CleanUpRawFile(evidence)
 
 
@@ -239,7 +274,7 @@ QC_df = pd.merge(right=proteinGroups_df,
 
 #plots-------------------------
 plt.clf()
-fig, axs = plt.subplots(8, layout='constrained',
+fig, axs = plt.subplots(9, layout='constrained',
                           figsize=(3.5 * 4, 3.5 * 6))
 
 #Standard line plots
@@ -272,8 +307,21 @@ sns.lineplot(data=msms,x="date",
               errorbar="sd",
               err_style="bars",
               ax=axs[7], rasterized=True)
-axs[7].set_title("MS2 intensity coverage")
+axs[7].set_title("MS2 median intensity coverage")
 axs[7].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+
+sns.lineplot(data=msScans,x="date",
+             y="Total ion current",
+             hue="type",
+             estimator="mean",
+             markers="o",
+             errorbar="sd",
+             err_style="bars",
+             ax=axs[8],
+             rasterized=True)
+axs[8].set_title("MS1 mean intensity on gradient")
+axs[8].legend(bbox_to_anchor=(1.02, 0.15), loc='upper left', borderaxespad=0)
+             
 
 plt.tight_layout()
 plt.savefig("QC_summary\\performance.pdf", dpi=300)
@@ -287,6 +335,7 @@ run_df = CleanUpList_NoAmount(run_lists)
 #specify date
 try:
     run_df = run_df[run_df["Raw file"].str.contains(specific_date)]
+
 except:
     pass
 
@@ -375,16 +424,16 @@ for element, search_name in run_df.iterrows():
                                       "msms_id_rate [%]",
                                       "isotope_patterns_detected",
                                       "isotope_atterns_sequenced_z_1"],
-                         "number" : [ms1_spectra,
-                                     ms2_spectra,
-                                     proteins_with_contaminants,
-                                     contaminants,
-                                     proteins,
-                                     proteins_min_2_peptides,
-                                     quantified_proteins,
-                                     msms_id_rate,
-                                     isotope_patterns_detected,
-                                     isotope_atterns_sequenced_z_1]}
+                          "number" : [ms1_spectra,
+                                      ms2_spectra,
+                                      proteins_with_contaminants,
+                                      contaminants,
+                                      proteins,
+                                      proteins_min_2_peptides,
+                                      quantified_proteins,
+                                      msms_id_rate,
+                                      isotope_patterns_detected,
+                                      isotope_atterns_sequenced_z_1]}
         
         summary_table = pd.DataFrame.from_dict(summary_table)
     elif msScan_produced==True:
@@ -400,17 +449,17 @@ for element, search_name in run_df.iterrows():
                                       "msms_id_rate (on gradient) [%]",
                                       "isotope_patterns_detected",
                                       "isotope_atterns_sequenced_z_1"],
-                         "number" : [ms1_spectra,
-                                     ms2_spectra,
-                                     proteins_with_contaminants,
-                                     contaminants,
-                                     proteins,
-                                     proteins_min_2_peptides,
-                                     quantified_proteins,
-                                     msms_id_rate,
-                                     msms_id_rate_gradient,
-                                     isotope_patterns_detected,
-                                     isotope_atterns_sequenced_z_1]}        
+                          "number" : [ms1_spectra,
+                                      ms2_spectra,
+                                      proteins_with_contaminants,
+                                      contaminants,
+                                      proteins,
+                                      proteins_min_2_peptides,
+                                      quantified_proteins,
+                                      msms_id_rate,
+                                      msms_id_rate_gradient,
+                                      isotope_patterns_detected,
+                                      isotope_atterns_sequenced_z_1]}        
         summary_table = pd.DataFrame.from_dict(summary_table)
     
 
