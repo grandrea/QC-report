@@ -7,12 +7,12 @@ import subprocess
 import re
 
 
-os.chdir("S:\\Processing_MQ\\")
+os.chdir("T:\\Processing_MQ\\") #path to top of directory of MQ runs
 
 run_mspicture = True
-msPicture_command_path = str("path\\to\\mspicture\\AppData\\Local\\\Apps\\ProteoWizard 3.0.22314.0cd8422 64-bit\\mspicture.exe")
-specific_date = "2308"
-specific_year = "E23"
+msPicture_command_path = str("C:\\Users\\path\\to\\mspicture.exe")
+specific_date = "2405"
+specific_year = "E24"
 
 #start and end of peptide elution in minutes more or less to get msms id rate on gradient
 pep_start = 15
